@@ -1,97 +1,135 @@
-# Clasificación con Random Forest
-
-#Explicación:
-#División de los datos: Al igual que en el modelo anterior, el dataset se divide en un conjunto de entrenamiento y uno de prueba.
-#Escalado de características: Se realiza un escalado para garantizar que las características estén en la misma escala y evitar que un valor muy grande influencie más que otros.
-#Entrenamiento del modelo Random Forest: Se utiliza el clasificador RandomForestClassifier, en este caso, con 10 estimadores (árboles) y el criterio de entropía para la división.
-#Predicciones: Se realiza la predicción tanto para un nuevo ejemplo como para el conjunto de prueba.
-#Evaluación del modelo: Se genera la matriz de confusión y se calcula la precisión para evaluar el rendimiento del modelo.
-#Visualización: Se muestran las fronteras de decisión en el conjunto de entrenamiento y prueba, lo que ayuda a entender cómo el modelo clasifica los datos.
-
-# Importación de las bibliotecas necesarias
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import StandardScaler, OneHotEncoder
+from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import Pipeline
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import confusion_matrix, accuracy_score
+from sklearn.metrics import (
+    confusion_matrix,
+    accuracy_score,
+    precision_score,
+    recall_score,
+    f1_score
+)
 from matplotlib.colors import ListedColormap
 
-# Cargando el dataset
-dataset = pd.read_csv('Social_Network_Ads.csv')  # Lee el archivo CSV con los datos
-X = dataset.iloc[:, :-1].values  # Extrae las características (Edad, Salario Estimado)
-y = dataset.iloc[:, -1].values  # Extrae la variable objetivo (Compra o No Compra)
+# 1. Cargar el dataset
+dataset = pd.read_csv("data/dataset_insurance.csv")
 
-# Dividiendo el dataset en conjunto de entrenamiento y conjunto de prueba
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.25, random_state = 0)
-print("Conjunto de entrenamiento (X_train):")
-print(X_train)
-print("Etiquetas de entrenamiento (y_train):")
-print(y_train)
-print("Conjunto de prueba (X_test):")
-print(X_test)
-print("Etiquetas de prueba (y_test):")
-print(y_test)
+# 2. Separar características (X) y objetivo (y)
+X = dataset.drop("CompraSeguro", axis=1)
+y = dataset["CompraSeguro"]
 
-# Escalado de características (Feature Scaling)
-sc = StandardScaler()
-X_train = sc.fit_transform(X_train)  # Ajusta y transforma el conjunto de entrenamiento
-X_test = sc.transform(X_test)  # Transforma el conjunto de prueba
-print("Conjunto de entrenamiento escalado (X_train):")
-print(X_train)
-print("Conjunto de prueba escalado (X_test):")
-print(X_test)
+# 3. Definir columnas numéricas y categóricas
+numeric_cols = ["Edad", "IngresoAnual"]
+categorical_cols = ["Genero", "NivelEstudios", "EstadoCivil"]
 
-# Entrenando el modelo de Random Forest sobre el conjunto de entrenamiento
-classifier = RandomForestClassifier(n_estimators = 10, criterion = 'entropy', random_state = 0)  # Usamos 'entropy' como criterio
-classifier.fit(X_train, y_train)  # Ajusta el modelo a los datos de entrenamiento
+# 4. Pipeline de preprocesamiento + Random Forest
+preprocessor = ColumnTransformer([
+    ("num", StandardScaler(), numeric_cols),
+    ("cat", OneHotEncoder(drop="first"), categorical_cols)
+])
+model = Pipeline([
+    ("preprocessor", preprocessor),
+    ("classifier", RandomForestClassifier(
+        n_estimators=10, criterion="entropy", random_state=0
+    ))
+])
 
-# Predicción de un nuevo resultado (Ejemplo: Edad = 30, Salario = 87000)
-resultado = classifier.predict(sc.transform([[30, 87000]]))  # Predice si comprará o no
-print(f"Predicción para edad 30 y salario 87000: {resultado}")
+# 5. División de datos y entrenamiento
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.25, random_state=0
+)
+model.fit(X_train, y_train)
 
-# Predicción sobre el conjunto de prueba
-y_pred = classifier.predict(X_test)  # Predice las etiquetas para el conjunto de prueba
-print("Predicciones sobre el conjunto de prueba:")
-print(np.concatenate((y_pred.reshape(len(y_pred), 1), y_test.reshape(len(y_test), 1)), 1))  # Compara las predicciones con las etiquetas reales
+# --- Visualización (solo conjunto de prueba, Edad vs IngresoAnual) ---
 
-# Creando la Matriz de Confusión
-cm = confusion_matrix(y_test, y_pred)  # Genera la matriz de confusión
-print("Matriz de Confusión:")
-print(cm)
-print("Precisión del modelo:")
-accuracy = accuracy_score(y_test, y_pred)
-print(accuracy)  # Muestra la precisión del modelo
+# 6. Preparar variables para la gráfica
+X_vis = X[["Edad", "IngresoAnual"]].values
+y_vis = (y == "Sí").astype(int).values  # 1=Sí, 0=No
 
-# Visualización de los resultados en el conjunto de entrenamiento
-X_set, y_set = sc.inverse_transform(X_train), y_train  # Inversa para visualizar en la escala original
-X1, X2 = np.meshgrid(np.arange(start = X_set[:, 0].min() - 10, stop = X_set[:, 0].max() + 10, step = 0.25),
-                     np.arange(start = X_set[:, 1].min() - 1000, stop = X_set[:, 1].max() + 1000, step = 0.25))
-plt.contourf(X1, X2, classifier.predict(sc.transform(np.array([X1.ravel(), X2.ravel()]).T)).reshape(X1.shape),
-             alpha = 0.75, cmap = ListedColormap(('red', 'green')))
-plt.xlim(X1.min(), X1.max())
-plt.ylim(X2.min(), X2.max())
-for i, j in enumerate(np.unique(y_set)):
-    plt.scatter(X_set[y_set == j, 0], X_set[y_set == j, 1], c = ListedColormap(('red', 'green'))(i), label = j)
-plt.title('Clasificación con Random Forest (Conjunto de Entrenamiento)')
-plt.xlabel('Edad')
-plt.ylabel('Salario Estimado')
-plt.legend()
+# 7. Dividir esos datos para visualización
+X_vis_train, X_vis_test, y_vis_train, y_vis_test = train_test_split(
+    X_vis, y_vis, test_size=0.25, random_state=0
+)
+
+# 8. Escalar solo Edad e IngresoAnual
+sc_vis = StandardScaler().fit(X_vis_train)
+
+# 9. Entrenar un Random Forest solo con estas dos features
+clf_vis = RandomForestClassifier(
+    n_estimators=10, criterion="entropy", random_state=0
+)
+clf_vis.fit(sc_vis.transform(X_vis_train), y_vis_train)
+
+# 10. Crear meshgrid en escala original
+x_min, x_max = X_vis_train[:, 0].min() - 1, X_vis_train[:, 0].max() + 1
+y_min, y_max = X_vis_train[:, 1].min() - 5000, X_vis_train[:, 1].max() + 5000
+xx, yy = np.meshgrid(
+    np.linspace(x_min, x_max, 300),
+    np.linspace(y_min, y_max, 300)
+)
+
+# 11. Predecir sobre el meshgrid
+grid = np.c_[xx.ravel(), yy.ravel()]
+Z = clf_vis.predict(sc_vis.transform(grid)).reshape(xx.shape)
+
+# 12. Dibujar la frontera y los puntos de test
+plt.figure(figsize=(8, 6))
+plt.contourf(xx, yy, Z, alpha=0.75, cmap=ListedColormap(("red", "green")))
+plt.scatter(
+    X_vis_test[:, 0], X_vis_test[:, 1],
+    c=y_vis_test, cmap=ListedColormap(("red", "green")),
+    edgecolors="k"
+)
+plt.title("Random Forest – Conjunto de Prueba")
+plt.xlabel("Edad")
+plt.ylabel("Ingreso Anual")
+plt.xlim(x_min, x_max)
+plt.ylim(y_min, y_max)
 plt.show()
 
-# Visualización de los resultados en el conjunto de prueba
-X_set, y_set = sc.inverse_transform(X_test), y_test  # Inversa para visualizar en la escala original
-X1, X2 = np.meshgrid(np.arange(start = X_set[:, 0].min() - 10, stop = X_set[:, 0].max() + 10, step = 0.25),
-                     np.arange(start = X_set[:, 1].min() - 1000, stop = X_set[:, 1].max() + 1000, step = 0.25))
-plt.contourf(X1, X2, classifier.predict(sc.transform(np.array([X1.ravel(), X2.ravel()]).T)).reshape(X1.shape),
-             alpha = 0.75, cmap = ListedColormap(('red', 'green')))
-plt.xlim(X1.min(), X1.max())
-plt.ylim(X2.min(), X2.max())
-for i, j in enumerate(np.unique(y_set)):
-    plt.scatter(X_set[y_set == j, 0], X_set[y_set == j, 1], c = ListedColormap(('red', 'green'))(i), label = j)
-plt.title('Clasificación con Random Forest (Conjunto de Prueba)')
-plt.xlabel('Edad')
-plt.ylabel('Salario Estimado')
-plt.legend()
-plt.show()
+# --- ANÁLISIS ---
+
+# 13. Predicción sobre el conjunto de prueba completo
+y_pred = model.predict(X_test)
+y_test_bin = (y_test == "Sí").astype(int)
+y_pred_bin = (y_pred == "Sí").astype(int)
+
+# 14. Cálculo de métricas
+cm = confusion_matrix(y_test_bin, y_pred_bin)
+acc = accuracy_score(y_test_bin, y_pred_bin)
+prec = precision_score(y_test_bin, y_pred_bin)
+rec = recall_score(y_test_bin, y_pred_bin)
+f1 = f1_score(y_test_bin, y_pred_bin)
+
+# 15. Conclusión
+print(f"""
+MODELO DE CLASIFICACIÓN RANDOM FOREST – ANÁLISIS DE RESULTADOS
+
+Este modelo se ha desarrollado utilizando datos de clientes para predecir si comprarán un seguro,
+en función de cinco variables:
+  - Edad (años, numérica)
+  - IngresoAnual (USD, numérica)
+  - Genero (Masculino/Femenino, categórica)
+  - NivelEstudios (Secundaria/Universitario/Postgrado, categórica)
+  - EstadoCivil (Soltero/Casado/Divorciado, categórica)
+
+El algoritmo empleado fue RandomForestClassifier con 10 árboles y criterio de entropía.
+La variable objetivo fue binarizada: 1 para "Sí" (compra) y 0 para "No" (no compra).
+
+Los resultados obtenidos fueron:
+
+  • Exactitud (accuracy):        {acc:.3f}
+  • Precisión (clase Sí):        {prec:.3f}
+  • Recall (sensibilidad):       {rec:.3f}
+  • F1-score:                    {f1:.3f}
+
+La matriz de confusión muestra {cm[1,1]} verdaderos positivos (TP) y {cm[0,0]} verdaderos negativos (TN),
+con {cm[0,1]} falsos positivos (FP) y {cm[1,0]} falsos negativos (FN).
+
+Estos resultados indican que el modelo clasifica correctamente aproximadamente el {acc*100:.1f}% de los casos
+y alcanza una sensibilidad del {rec*100:.1f}% para detectar a los clientes que realmente compran el seguro.
+""")

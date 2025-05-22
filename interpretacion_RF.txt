@@ -1,0 +1,25 @@
+MODELO DE CLASIFICACIÓN RANDOM FOREST – ANÁLISIS DE RESULTADOS
+
+Este modelo se ha desarrollado utilizando datos de clientes para predecir si comprarán un seguro,
+en función de cinco variables:
+  - Edad (años, numérica)
+  - IngresoAnual (USD, numérica)
+  - Genero (Masculino/Femenino, categórica)
+  - NivelEstudios (Secundaria/Universitario/Postgrado, categórica)
+  - EstadoCivil (Soltero/Casado/Divorciado, categórica)
+
+El algoritmo empleado fue RandomForestClassifier con 10 árboles y criterio de entropía.
+La variable objetivo fue binarizada: 1 para "Sí" (compra) y 0 para "No" (no compra).
+
+Los resultados obtenidos fueron:
+
+  • Exactitud (accuracy):        0.952
+  • Precisión (clase Sí):        0.909
+  • Recall (sensibilidad):       0.833
+  • F1-score:                    0.870
+
+La matriz de confusión muestra 20 verdaderos positivos (TP) y 99 verdaderos negativos (TN),
+con 2 falsos positivos (FP) y 4 falsos negativos (FN).
+
+Estos resultados indican que el modelo clasifica correctamente aproximadamente el 95.2% de los casos
+y alcanza una sensibilidad del 83.3% para detectar a los clientes que realmente compran el seguro.
